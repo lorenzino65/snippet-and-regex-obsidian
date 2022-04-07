@@ -10,6 +10,7 @@
     "moduleResolution": "node",
     "importHelpers": true,
     "isolatedModules": true,
+    "noUnusedLocals": false,
     "lib": [
       "DOM",
       "ES5",

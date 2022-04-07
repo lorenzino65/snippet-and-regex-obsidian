@@ -1,0 +1,36 @@
+context:
+  - amici: 80
+    lorenzo: 20
+    reso: 1.0
+
+snippets:
+
+
+  Hello:
+    trigger:
+      - value: "hello"
+        context: Notes
+      - value: ["Hello", "Ciao"]
+        word: false
+      - value: /([A-Za-z])_(\d\d)/
+        context: Regex
+        word: false
+    # ${1:default}, $0 positions
+    # %{1}, %{2}, variables   
+    response: 
+    - "World" # | object
+    - value: |
+        <div class="${1:container}">
+        \t\$${2:%{1}}\% %{2} 
+        <div/>$0 
+      type: text # bash(sh), python(py), node(js) 
+
+
+title: test 
+author: &author "Smith, A."
+type: snippets
+
+tags: 
+  - *author
+  - help:
+    - ciao  
