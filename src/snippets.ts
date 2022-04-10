@@ -9,7 +9,8 @@ import {
   PluginSettingTab,
   Setting,
   FileSystemAdapter,
-  CachedMetadata
+  CachedMetadata,
+  TAbstractFile
 } from "obsidian";
 import * as fs from 'fs/promises';
 const Path = require('path');
@@ -18,22 +19,27 @@ import compile from 'dfa/compile';
 
 export function getSnippets(snippetsDir, snippets, context) {
 
-  getYaml(snippetsDir).then(yaml =>
-    formatSnippets(yaml.snippets)
-  )
+  // getYaml(snippetsDir).then(yaml =>
+  //   formatSnippets(yaml.snippets)
+  // )
 
 
-  // for (let [startIndex, endIndex, tag] of stateMachine.match([0, 1, 2, 3, 0, 4, 6])) {
-  //   console.log('match:', startIndex, endIndex, tag);
-  // }
 
+
+  this.app.vault.read(this.app.vault.getAbstractFileByPath('snippets/hangul.machine')).then(file => {
+
+    const stateMachine = compile(file);
+    // find matches
+    const [startIndex, tag] = stateMachine.match("0123045")
+    console.log('match:', startIndex,  tag);
+
+  })
 }
 
 
 
 async function getYaml(snippetsDir) {
   // this.app.vault.configDir
-  // Get document, or throw exception on error.FileSystemAdapter.getBasePath()
   const dir = snippetsDir
 
   const vaultDir = this.app.vault.adapter.basePath;
@@ -50,7 +56,7 @@ async function getYaml(snippetsDir) {
           return new Promise((resolve, reject) => {
             try {
               const cache: CachedMetadata = this.app.metadataCache.getCache(Path.join(path, file.name))
-              if (cache.frontmatter !== undefined && cache.frontmatter.type !== undefined) {
+              if (cache !== undefined && cache.frontmatter !== undefined && cache.frontmatter.type !== undefined) {
                 try {
                   yaml[cache.frontmatter.type].push({ data: cache.frontmatter[cache.frontmatter.type], [Symbol.for("file")]: Path.join(path, file.name) })
                 }
