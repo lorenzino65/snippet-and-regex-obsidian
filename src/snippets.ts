@@ -17,21 +17,30 @@ const Path = require('path');
 import { readdir } from 'fs/promises';
 import compile from 'dfa/compile';
 
+const Ascii10 = Object.fromEntries({
+  *[Symbol.iterator]() {
+    for (let index = 0; index < 256; index++) {
+      yield [String.fromCharCode(index), index]
+    }
+  }
+})
+
+
 export function getSnippets(snippetsDir, snippets, context) {
 
-  // getYaml(snippetsDir).then(yaml =>
-  //   formatSnippets(yaml.snippets)
-  // )
+  getYaml(snippetsDir).then(yaml =>
+    formatSnippets(yaml.snippets)
+  )
 
 
 
 
   this.app.vault.read(this.app.vault.getAbstractFileByPath('snippets/hangul.machine')).then(file => {
 
-    const stateMachine = compile(file);
+    const stateMachine = compile(file, Ascii10);
     // find matches
-    const [startIndex, tag] = stateMachine.match("0123045")
-    console.log('match:', startIndex,  tag);
+    const [startIndex, tag] = stateMachine.match("012345")
+    console.log('match:', startIndex, tag);
 
   })
 }
