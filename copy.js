@@ -1,7 +1,11 @@
 'use strict';
 
+const { arrayBuffer } = require("stream/consumers");
+
 Object.defineProperty(exports, '__esModule', { value: true });
 
+
+const asciiLength = 256;
 /**
  * Returns a new set representing the union of a and b.
  */
@@ -68,6 +72,22 @@ class Variable extends Node {
 
   copy() {
     return new Variable(this.name);
+  }
+
+}
+
+/**
+ * Represents a definition reference
+ */
+
+class Definition extends Node {
+  constructor(name) {
+    super();
+    this.name = name;
+  }
+
+  copy() {
+    return new Definition(this.name);
   }
 
 }
@@ -218,7 +238,7 @@ function buildRepetition(expression, min = 0, max = Infinity) {
   }
 
   var res = null;
-
+  console.log(expression)
   for (var i = 0; i < min; i++) {
     res = concat(res, expression.copy());
   }
@@ -305,6 +325,7 @@ class Tag extends Leaf {
 var nodes = /*#__PURE__*/Object.freeze({
   Node: Node,
   Variable: Variable,
+  Definition: Definition,
   Comment: Comment,
   Assignment: Assignment,
   Alternation: Alternation,
@@ -325,7 +346,7 @@ function peg$subclass(child, parent) {
   child.prototype = new ctor();
 }
 
-function peg$SyntaxError(message, expected, found, location) {
+function SyntaxErrorObject(message, expected, found, location) {
   this.message = message;
   this.expected = expected;
   this.found = found;
@@ -333,13 +354,13 @@ function peg$SyntaxError(message, expected, found, location) {
   this.name = "SyntaxError";
 
   if (typeof Error.captureStackTrace === "function") {
-    Error.captureStackTrace(this, peg$SyntaxError);
+    Error.captureStackTrace(this, SyntaxErrorObject);
   }
 }
 
-peg$subclass(peg$SyntaxError, Error);
+peg$subclass(SyntaxErrorObject, Error);
 
-peg$SyntaxError.buildMessage = function (expected, found) {
+SyntaxErrorObject.buildMessage = function (expected, found) {
   var DESCRIBE_EXPECTATION_FNS = {
     literal: function (expectation) {
       return "\"" + literalEscape(expectation.text) + "\"";
@@ -430,71 +451,71 @@ peg$SyntaxError.buildMessage = function (expected, found) {
   return "Expected " + describeExpected(expected) + " but " + describeFound(found) + " found.";
 };
 
-function peg$parse(input, options) {
+function parseFuntion(input, options) {
   options = options !== void 0 ? options : {};
 
   var FAILED = {},
-    peg$startRuleFunctions = {
-      rules: peg$parserules
+    startRuleFunctions = {
+      rules: parseRules
     },
-    peg$startRuleFunction = peg$parserules,
-    peg$c0 = function (s) {
-      return s;
-    },
+    startRuleFunction = parseRules,
+    definitionsArea = true,
     hashtag = "#",
-    peg$c2 = peg$literalExpectation("#", false),
-    peg$c3 = /^[^\r\n]/,
-    peg$c4 = peg$classExpectation(["\r", "\n"], true, false),
+    hashtagClass = literalExpectation("#", false),
+    nonSpaces = /^[^\r\n]/,
+    nonSpacesClass = classExpectation(["\r", "\n"], true, false),
     startingNewLine = /^[\r\n]/,
-    peg$c6 = peg$classExpectation(["\r", "\n"], false, false),
-    peg$c7 = function (v) {
+    startingNewLineClass = classExpectation(["\r", "\n"], false, false),
+    nonMetaCharacters = /[^{}[\]()$|*+?/]/,
+    nonMetaCharactersClass = classExpectation(["{", "}", "[", "]", "(", ")", "$", "|", "*", "+", "?", "/"], true, false),
+    setComment = function (v) {
       return new n.Comment(v.join(''));
     },
+    backslash = "\\",
+    backslashLiteral = literalExpectation("\\", false),
     frontslash = "/",
-    frontslashLiteral = peg$literalExpectation("/", false),
+    frontslashLiteral = literalExpectation("/", false),
     setAssign = function (v, e) {
       return new n.Assignment(v, e);
     },
     setVariable = function (v) {
       return new n.Variable(v);
     },
-    peg$c14 = "|",
-    peg$c15 = peg$literalExpectation("|", false),
-    peg$c16 = function (a, b) {
+    setDefinition = function (v) {
+      return new n.Definition(v);
+    },
+    orChar = "|",
+    orCharLiteral = literalExpectation("|", false),
+    setAlternation = function (a, b) {
       return new n.Alternation(a, b);
     },
     setConcatenation = function (a, b) {
       return new n.Concatenation(a, b);
     },
-    peg$c18 = ":",
-    peg$c19 = peg$literalExpectation(":", false),
-    setTag = function (t, e) {
-      return new n.Concatenation(e, new n.Tag(t));
-    },
+    point = ".",
+    pointLiteral = literalExpectation(".", false),
+    inverseChar = "^",
+    inverseCharLiteral = literalExpectation("^", false),
     asterisk = "*",
-    asteriskLiteral = peg$literalExpectation("*", false),
+    asteriskLiteral = literalExpectation("*", false),
     setAsteriskRepeat = function (t) {
       return new n.Repeat(t, '*');
     },
     questionMark = "?",
-    questionMarkLiteral = peg$literalExpectation("?", false),
+    questionMarkLiteral = literalExpectation("?", false),
     setQuestionMarkRepeat = function (t) {
       return new n.Repeat(t, '?');
     },
     PlusSign = "+",
-    PlusSignLiteral = peg$literalExpectation("+", false),
+    PlusSignLiteral = literalExpectation("+", false),
     setPlusRepeat = function (t) {
       return new n.Repeat(t, '+');
     },
-    OpenGraphParenthesis = "{",
-    OpenGraphParenthesisLiteral = peg$literalExpectation("{", false),
-    CloseGraphParenthesis = "}",
-    CloseGraphParenthesisLiteral = peg$literalExpectation("}", false),
     setFixedRepetition = function (t, m) {
       return n.buildRepetition(t, m, m);
     },
     comma = ",",
-    commaLiteral = peg$literalExpectation(",", false),
+    commaLiteral = literalExpectation(",", false),
     setMinRepetition = function (t, min) {
       return n.buildRepetition(t, min, Infinity);
     },
@@ -504,43 +525,176 @@ function peg$parse(input, options) {
     setRepetition = function (t, min, max) {
       return n.buildRepetition(t, min, max);
     },
+    setPreAntiRange = function (startChar, finishChar) {
+      if (startChar.charCodeAt(0) > finishChar.charCodeAt(0)) return FAILED
+      let array = []
+      for (let i = startChar.charCodeAt(0); i <= finishChar.charCodeAt(0); i++) {
+        array.push(i)
+      }
+      return array
+    },
+    setDigitsAntiRange = function () {
+      return setPreAntiRange("0", "9")
+    },
+    setSpacesAntiRange = function () {
+      return [' '.charCodeAt(0), '\r'.charCodeAt(0), '\n'.charCodeAt(0), '\t'.charCodeAt(0), '\f'.charCodeAt(0), '\v'.charCodeAt(0)]
+    },
+    setWordAntiRange = function () {
+      let filterRange = '_'.charCodeAt(0);
+      for (let i = 'a'.charCodeAt(0); i < 'z'.charCodeAt(0); i++) {
+        filterRange.push(i)
+      }
+      for (let i = 'A'.charCodeAt(0); i < 'Z'.charCodeAt(0); i++) {
+        filterRange.push(i)
+      }
+      for (let i = 0; i < 10; i++) {
+        filterRange.push(i)
+      }
+      return filterRange
+    },
+    setNonDigitsAntiRange = function () {
+      const filter = setDigitsAntiRange();
+      return Array.from({ length: asciiLength }, (_, i) => { i }).filter((n) => { !filter.contains(n) })
+    },
+    setNonSpacesAntiRange = function () {
+      const filter = setSpacesAntiRange();
+      return Array.from({ length: asciiLength }, (_, i) => { i }).filter((n) => { !filter.contains(n) })
+    },
+    setNonWordAntiRange = function () {
+      const filter = setWordAntiRange();
+      return Array.from({ length: asciiLength }, (_, i) => { i }).filter((n) => { !filter.contains(n) })
+    },
+    setPointRange = function () {
+      return setAntiRange(["\n"])
+    },
+    setAntiRange = function (filter) {
+      //filter an array of Ascii codes
+      console.log(filter)
+      let filteredArray = Array.from({ length: asciiLength }, (_, i) => { return i }).filter((n) => { return !filter.contains(n) })
+      return filteredArray.reduce((OldAltern, element, i) => {
+        if (i == 1) {
+          OldAltern = setLiteral(String.fromCharCode(filteredArray[0]))
+        }
+        return setAlternation(OldAltern, setLiteral(String.fromCharCode(element)))
+      })
+    },
+    setRange = function (startChar, finishChar) {
+      if (startChar.charCodeAt(0) > finishChar.charCodeAt(0)) return FAILED
+      else if (startChar.charCodeAt(0) == finishChar.charCodeAt(0)) return setLiteral(startChar)
+      let range = setLiteral(startChar)
+      for (let i = startChar.charCodeAt(0) + 1; i <= finishChar.charCodeAt(0); i++) {
+        range = setAlternation(range, setLiteral(String.fromCharCode(i)))
+      }
+      return range
+    },
     setLiteral = function (x) {
       return new n.Literal(x);
     },
+    backSpace = "\b",
+    backSpaceLiteral = literalExpectation("\b", false),
+    FormFeed = "\f",
+    formFeedLiteral = literalExpectation("\f", false),
+    newLine = "\n",
+    newLineLiteral = literalExpectation("\n", false),
+    carriageReturn = "\r",
+    carriageReturnLiteral = literalExpectation("\r", false),
+    horizontalTab = "\t",
+    verticalTab = "\v",
+    verticalTabLiteral = literalExpectation("\v", false),
+    horizontalTabLiteral = literalExpectation("\t", false),
     openRoundParenthesis = "(",
-    openRoundParenthesisLiteral = peg$literalExpectation("(", false),
+    openRoundParenthesisLiteral = literalExpectation("(", false),
     closedRoundParenthesis = ")",
-    closedRoundParenthesisLiteral = peg$literalExpectation(")", false),
+    closedRoundParenthesisLiteral = literalExpectation(")", false),
+    openSquareParenthesis = "[",
+    openSquareParenthesisLiteral = literalExpectation("[", false),
+    closedSquareParenthesis = "]",
+    closedSquareParenthesisLiteral = literalExpectation("]", false),
+    openGraphParenthesis = "{",
+    openGraphParenthesisLiteral = literalExpectation("{", false),
+    closedGraphParenthesis = "}",
+    closedGraphParenthesisLiteral = literalExpectation("}", false),
     returnArgument = function (e) {
       return e;
     },
     wordCharacters = /^\w/,
-    wordCharactersClass = peg$classExpectation([["a", "z"], ["A", "Z"], ["0", "9"], "_"], false, false),
+    wordCharactersClass = classExpectation([["a", "z"], ["A", "Z"], ["0", "9"], "_"], false, false),
+    setWordRange = function () {
+      let range = setLiteral('_');
+      for (let i = 'a'.charCodeAt(0); i < 'z'.charCodeAt(0); i++) {
+        range = setAlternation(range, setLiteral(String.fromCharCode(i)))
+      }
+      for (let i = 'A'.charCodeAt(0); i < 'Z'.charCodeAt(0); i++) {
+        range = setAlternation(range, setLiteral(String.fromCharCode(i)))
+      }
+      for (let i = 0; i < 10; i++) {
+        range = setAlternation(range, setLiteral(i))
+      }
+      return range
+    },
+    nonWordCharacters = /^\W/,
+    nonwordCharactersClass = classExpectation([["a", "z"], ["A", "Z"], ["0", "9"], "_"], true, false),
+    setNonWordRange = function () {
+      let filterRange = ['_'.charCodeAt(0)];
+      for (let i = 'a'.charCodeAt(0); i < 'z'.charCodeAt(0); i++) {
+        filterRange.push(i)
+      }
+      for (let i = 'A'.charCodeAt(0); i < 'Z'.charCodeAt(0); i++) {
+        filterRange.push(i)
+      }
+      for (let i = 0; i < 10; i++) {
+        filterRange.push(i)
+      }
+      return setAntiRange(filterRange)
+    },
     digits = /^[0-9]/,
-    digitsClass = peg$classExpectation([["0", "9"]], false, false),
+    digitsClass = classExpectation([["0", "9"]], false, false),
+    setDigitsRange = function () {
+      let range = setLiteral('0');
+      for (let i = 1; i < 10; i++) {
+        range = setAlternation(range, setLiteral(i.toString()))
+      }
+      return range
+    },
+    nonDigits = /^\D/,
+    nonDigitsClass = classExpectation([["0", "9"]], true, false),
+    setNonDigitsRange = function () {
+      let zeroCode = "0".charCodeAt(0)
+      return setAntiRange(Array.from({ length: 10 }, (_, i) => { return zeroCode + i }))
+    },
     setNumber = function (num) {
       return parseInt(num.join(''));
     },
-    peg$c55 = /^[ \t\r\n]/,
-    peg$c56 = peg$classExpectation([" ", "\t", "\r", "\n"], false, false),
+    spaces = /^\s/,
+    spacesClass = classExpectation([" ", "\t", "\r", "\n"], false, false),
+    setSpacesRange = function () {
+      let range = setLiteral(' ');
+      for (let space in "\r\n\t\f\v") {
+        range = setAlternation(range, setLiteral(space))
+      }
+      return range
+    },
+    setNonSpacesRange = function () {
+      return setAntiRange([' '.charCodeAt(0), '\r'.charCodeAt(0), '\n'.charCodeAt(0), '\t'.charCodeAt(0), '\f'.charCodeAt(0), '\v'.charCodeAt(0)])
+    },
     currPos = 0,
     peg$posDetailsCache = [{
       line: 1,
       column: 1
     }],
-    peg$maxFailPos = 0,
-    peg$maxFailExpected = [],
+    maxFailPos = 0,
+    maxFailExpectedArray = [],
     peg$result;
 
   if ("startRule" in options) {
-    if (!(options.startRule in peg$startRuleFunctions)) {
+    if (!(options.startRule in startRuleFunctions)) {
       throw new Error("Can't start parsing from rule \"" + options.startRule + "\".");
     }
 
-    peg$startRuleFunction = peg$startRuleFunctions[options.startRule];
+    startRuleFunction = startRuleFunctions[options.startRule];
   }
 
-  function peg$literalExpectation(text, ignoreCase) {
+  function literalExpectation(text, ignoreCase) {
     return {
       type: "literal",
       text: text,
@@ -548,7 +702,7 @@ function peg$parse(input, options) {
     };
   }
 
-  function peg$classExpectation(parts, inverted, ignoreCase) {
+  function classExpectation(parts, inverted, ignoreCase) {
     return {
       type: "class",
       parts: parts,
@@ -557,7 +711,7 @@ function peg$parse(input, options) {
     };
   }
 
-  function peg$endExpectation() {
+  function endExpectation() {
     return {
       type: "end"
     };
@@ -598,7 +752,7 @@ function peg$parse(input, options) {
     }
   }
 
-  function peg$computeLocation(startPos, endPos) {
+  function computeLocation(startPos, endPos) {
     var startPosDetails = peg$computePosDetails(startPos),
       endPosDetails = peg$computePosDetails(endPos);
     return {
@@ -616,31 +770,31 @@ function peg$parse(input, options) {
   }
 
   function setFail(expected) {
-    if (currPos < peg$maxFailPos) {
+    if (currPos < maxFailPos) {
       return;
     }
 
-    if (currPos > peg$maxFailPos) {
-      peg$maxFailPos = currPos;
-      peg$maxFailExpected = [];
+    if (currPos > maxFailPos) {
+      maxFailPos = currPos;
+      maxFailExpectedArray = [];
     }
 
-    peg$maxFailExpected.push(expected);
+    maxFailExpectedArray.push(expected);
   }
 
-  function peg$buildStructuredError(expected, found, location) {
-    return new peg$SyntaxError(peg$SyntaxError.buildMessage(expected, found), expected, found, location);
+  function buildStructuredError(expected, found, location) {
+    return new SyntaxErrorObject(SyntaxErrorObject.buildMessage(expected, found), expected, found, location);
   }
 
-  function peg$parserules() {
+  function parseRules() {
     var s0, s1;
     s0 = [];
-    s1 = peg$parsestatement();
+    s1 = parseStatement();
 
     if (s1 !== FAILED) {
       while (s1 !== FAILED) {
         s0.push(s1);
-        s1 = peg$parsestatement();
+        s1 = parseStatement();
       }
     } else {
       s0 = FAILED;
@@ -649,7 +803,7 @@ function peg$parse(input, options) {
     return s0;
   }
 
-  function peg$parsestatement() {
+  function parseStatement() {
     var s0, s1, s2;
     s0 = currPos;
     s1 = parseAssignmentOrComment();
@@ -658,7 +812,7 @@ function peg$parse(input, options) {
       s2 = parseSpaces();
 
       if (s2 !== FAILED) {
-        s1 = peg$c0(s1);
+        s1 = returnArgument(s1);
         s0 = s1;
       } else {
         currPos = s0;
@@ -674,55 +828,61 @@ function peg$parse(input, options) {
 
   function parseAssignmentOrComment() {
     var s0;
-    s0 = parseAssignment();
 
+    s0 = parseComment();
     if (s0 === FAILED) {
-      s0 = peg$parsecomment();
+      s0 = parseAssignment();
     }
 
     return s0;
   }
 
-  function peg$parsecomment() {
+  function parseComment() {
     var s0, s1, s2, s3;
     s0 = currPos;
 
-    if (input.charCodeAt(currPos) === 35) {
+    if (input.charCodeAt(currPos) === "#".charCodeAt(0)) {
       s1 = hashtag;
       currPos++;
     } else {
       s1 = FAILED;
 
       {
-        setFail(peg$c2);
+        setFail(hashtagClass);
+      }
+    }
+
+    if (s1 !== FAILED) {
+      if (input.charCodeAt(currPos) === "#".charCodeAt(0)) {
+        definitionsArea = !definitionsArea
       }
     }
 
     if (s1 !== FAILED) {
       s2 = [];
 
-      if (peg$c3.test(input.charAt(currPos))) {
+      if (nonSpaces.test(input.charAt(currPos))) {
         s3 = input.charAt(currPos);
         currPos++;
       } else {
         s3 = FAILED;
 
         {
-          setFail(peg$c4);
+          setFail(nonSpacesClass);
         }
       }
 
       while (s3 !== FAILED) {
         s2.push(s3);
 
-        if (peg$c3.test(input.charAt(currPos))) {
+        if (nonSpaces.test(input.charAt(currPos))) {
           s3 = input.charAt(currPos);
           currPos++;
         } else {
           s3 = FAILED;
 
           {
-            setFail(peg$c4);
+            setFail(nonSpacesClass);
           }
         }
       }
@@ -735,12 +895,12 @@ function peg$parse(input, options) {
           s3 = FAILED;
 
           {
-            setFail(peg$c6);
+            setFail(startingNewLineClass);
           }
         }
 
         if (s3 !== FAILED) {
-          s1 = peg$c7(s2);
+          s1 = setComment(s2);
           s0 = s1;
         } else {
           currPos = s0;
@@ -759,15 +919,19 @@ function peg$parse(input, options) {
   }
 
   function parseAssignment() {
-    var s0, s1, s2, s3, s4, s5, s6, s7;
+    var s0, s1, s2, s3, s4, s5
     s0 = currPos;
-    s1 = parseVariable();
+    if (definitionsArea) {
+      s1 = parseDefinition()
+    } else {
+      s1 = parseVariable();
+    }
 
     if (s1 !== FAILED) {
       s2 = parseSpaces();
 
       if (s2 !== FAILED) {
-        if (input.charCodeAt(currPos) === 47) {
+        if (input.charCodeAt(currPos) === "/".charCodeAt(0)) {
           s3 = frontslash;
           currPos++;
         } else {
@@ -779,45 +943,34 @@ function peg$parse(input, options) {
         }
 
         if (s3 !== FAILED) {
-          s4 = parseSpaces();
+          s4 = parseAlternation();
 
           if (s4 !== FAILED) {
-            s5 = parseAlternation();
+
+            if (input.charCodeAt(currPos) === "/".charCodeAt(0)) {
+              s5 = frontslash;
+              currPos++;
+            } else {
+              s5 = FAILED;
+
+              {
+                setFail(frontslashLiteral);
+              }
+            }
 
             if (s5 !== FAILED) {
-              s6 = parseSpaces();
-
-              if (s6 !== FAILED) {
-                if (input.charCodeAt(currPos) === 47) {
-                  s7 = frontslash;
-                  currPos++;
-                } else {
-                  s7 = FAILED;
-
-                  {
-                    setFail(frontslashLiteral);
-                  }
-                }
-
-                if (s7 !== FAILED) {
-                  s1 = setAssign(s1, s5);
-                  s0 = s1;
-                } else {
-                  currPos = s0;
-                  s0 = FAILED;
-                }
-              } else {
-                currPos = s0;
-                s0 = FAILED;
-              }
+              s1 = setAssign(s1, s4);
+              s0 = s1;
             } else {
               currPos = s0;
               s0 = FAILED;
             }
+
           } else {
             currPos = s0;
             s0 = FAILED;
           }
+
         } else {
           currPos = s0;
           s0 = FAILED;
@@ -846,52 +999,52 @@ function peg$parse(input, options) {
     s0 = s1;
     return s0;
   }
+  function parseDefinition() {
+    var s0, s1;
+    s0 = currPos;
+    s1 = parseName();
+
+    if (s1 !== FAILED) {
+      s1 = setDefinition(s1);
+    }
+
+    s0 = s1;
+    return s0;
+  }
 
   function parseAlternation() {
-    var s0, s1, s2, s3, s4, s5;
+    var s0, s1, s2, s3;
     s0 = currPos;
     s1 = parseConcatenation();
 
     if (s1 !== FAILED) {
-      s2 = parseSpaces();
+      if (input.charCodeAt(currPos) === ("|").charCodeAt(0)) {
+        s2 = orChar;
+        currPos++;
+      } else {
+        s2 = FAILED;
+
+        {
+          setFail(orCharLiteral);
+        }
+      }
 
       if (s2 !== FAILED) {
-        if (input.charCodeAt(currPos) === 124) {
-          s3 = peg$c14;
-          currPos++;
-        } else {
-          s3 = FAILED;
-
-          {
-            setFail(peg$c15);
-          }
-        }
+        s3 = parseAlternation();
 
         if (s3 !== FAILED) {
-          s4 = parseSpaces();
-
-          if (s4 !== FAILED) {
-            s5 = parseAlternation();
-
-            if (s5 !== FAILED) {
-              s1 = peg$c16(s1, s5);
-              s0 = s1;
-            } else {
-              currPos = s0;
-              s0 = FAILED;
-            }
-          } else {
-            currPos = s0;
-            s0 = FAILED;
-          }
+          s1 = setAlternation(s1, s3);
+          s0 = s1;
         } else {
           currPos = s0;
           s0 = FAILED;
         }
+
       } else {
         currPos = s0;
         s0 = FAILED;
       }
+
     } else {
       currPos = s0;
       s0 = FAILED;
@@ -900,28 +1053,20 @@ function peg$parse(input, options) {
     if (s0 === FAILED) {
       s0 = parseConcatenation();
     }
-
     return s0;
   }
 
   function parseConcatenation() {
-    var s0, s1, s2, s3;
+    var s0, s1, s2;
     s0 = currPos;
     s1 = parseRepeat();
 
     if (s1 !== FAILED) {
-      s2 = parseSpaces();
+      s2 = parseConcatenation();
 
       if (s2 !== FAILED) {
-        s3 = parseConcatenation();
-
-        if (s3 !== FAILED) {
-          s1 = setConcatenation(s1, s3);
-          s0 = s1;
-        } else {
-          currPos = s0;
-          s0 = FAILED;
-        }
+        s1 = setConcatenation(s1, s2);
+        s0 = s1;
       } else {
         currPos = s0;
         s0 = FAILED;
@@ -941,29 +1086,23 @@ function peg$parse(input, options) {
   function parseRepeat() {
     var s0, s1, s2, s3, s4, s5, s6;
     s0 = currPos;
-    s1 = parseName();
+    s1 = parseTerm();
 
     if (s1 !== FAILED) {
-      if (input.charCodeAt(currPos) === 58) {
-        s2 = peg$c18;
+      if (input.charCodeAt(currPos) === "*".charCodeAt(0)) {
+        s2 = asterisk;
         currPos++;
       } else {
         s2 = FAILED;
 
         {
-          setFail(peg$c19);
+          setFail(asteriskLiteral);
         }
       }
-      if (s2 !== FAILED) {
-        s3 = parseRepeat();
 
-        if (s3 !== FAILED) {
-          s1 = setTag(s1, s3);
-          s0 = s1;
-        } else {
-          currPos = s0;
-          s0 = FAILED;
-        }
+      if (s2 !== FAILED) {
+        s1 = setAsteriskRepeat(s1);
+        s0 = s1;
       } else {
         currPos = s0;
         s0 = FAILED;
@@ -978,19 +1117,19 @@ function peg$parse(input, options) {
       s1 = parseTerm();
 
       if (s1 !== FAILED) {
-        if (input.charCodeAt(currPos) === 42) {
-          s2 = asterisk;
+        if (input.charCodeAt(currPos) === "?".charCodeAt(0)) {
+          s2 = questionMark;
           currPos++;
         } else {
           s2 = FAILED;
-
           {
-            setFail(asteriskLiteral);
+            setFail(questionMarkLiteral);
           }
         }
 
+
         if (s2 !== FAILED) {
-          s1 = setAsteriskRepeat(s1);
+          s1 = setQuestionMarkRepeat(s1);
           s0 = s1;
         } else {
           currPos = s0;
@@ -1006,19 +1145,19 @@ function peg$parse(input, options) {
         s1 = parseTerm();
 
         if (s1 !== FAILED) {
-          if (input.charCodeAt(currPos) === 63) {
-            s2 = questionMark;
+          if (input.charCodeAt(currPos) === "+".charCodeAt(0)) {
+            s2 = PlusSign;
             currPos++;
           } else {
             s2 = FAILED;
+
             {
-              setFail(questionMarkLiteral);
+              setFail(PlusSignLiteral);
             }
           }
 
-
           if (s2 !== FAILED) {
-            s1 = setQuestionMarkRepeat(s1);
+            s1 = setPlusRepeat(s1);
             s0 = s1;
           } else {
             currPos = s0;
@@ -1034,20 +1173,43 @@ function peg$parse(input, options) {
           s1 = parseTerm();
 
           if (s1 !== FAILED) {
-            if (input.charCodeAt(currPos) === 43) {
-              s2 = PlusSign;
+            if (input.charCodeAt(currPos) === "{".charCodeAt(0)) {
+              s2 = openGraphParenthesis;
               currPos++;
             } else {
               s2 = FAILED;
 
               {
-                setFail(PlusSignLiteral);
+                setFail(openGraphParenthesisLiteral);
               }
             }
 
             if (s2 !== FAILED) {
-              s1 = setPlusRepeat(s1);
-              s0 = s1;
+              s3 = parseNumber();
+
+              if (s3 !== FAILED) {
+                if (input.charCodeAt(currPos) === "}".charCodeAt(0)) {
+                  s4 = closedGraphParenthesis;
+                  currPos++;
+                } else {
+                  s4 = FAILED;
+
+                  {
+                    setFail(closedGraphParenthesisLiteral);
+                  }
+                }
+
+                if (s4 !== FAILED) {
+                  s1 = setFixedRepetition(s1, s3);
+                  s0 = s1;
+                } else {
+                  currPos = s0;
+                  s0 = FAILED;
+                }
+              } else {
+                currPos = s0;
+                s0 = FAILED;
+              }
             } else {
               currPos = s0;
               s0 = FAILED;
@@ -1062,14 +1224,14 @@ function peg$parse(input, options) {
             s1 = parseTerm();
 
             if (s1 !== FAILED) {
-              if (input.charCodeAt(currPos) === 123) {
-                s2 = OpenGraphParenthesis;
+              if (input.charCodeAt(currPos) === "{".charCodeAt(0)) {
+                s2 = openGraphParenthesis;
                 currPos++;
               } else {
                 s2 = FAILED;
 
                 {
-                  setFail(OpenGraphParenthesisLiteral);
+                  setFail(openGraphParenthesisLiteral);
                 }
               }
 
@@ -1077,20 +1239,36 @@ function peg$parse(input, options) {
                 s3 = parseNumber();
 
                 if (s3 !== FAILED) {
-                  if (input.charCodeAt(currPos) === 125) {
-                    s4 = CloseGraphParenthesis;
+                  if (input.charCodeAt(currPos) === ",".charCodeAt(0)) {
+                    s4 = comma;
                     currPos++;
                   } else {
                     s4 = FAILED;
 
                     {
-                      setFail(CloseGraphParenthesisLiteral);
+                      setFail(commaLiteral);
                     }
                   }
 
                   if (s4 !== FAILED) {
-                    s1 = setFixedRepetition(s1, s3);
-                    s0 = s1;
+                    if (input.charCodeAt(currPos) === "}".charCodeAt(0)) {
+                      s5 = closedGraphParenthesis;
+                      currPos++;
+                    } else {
+                      s5 = FAILED;
+
+                      {
+                        setFail(closedGraphParenthesisLiteral);
+                      }
+                    }
+
+                    if (s5 !== FAILED) {
+                      s1 = setMinRepetition(s1, s3);
+                      s0 = s1;
+                    } else {
+                      currPos = s0;
+                      s0 = FAILED;
+                    }
                   } else {
                     currPos = s0;
                     s0 = FAILED;
@@ -1113,46 +1291,46 @@ function peg$parse(input, options) {
               s1 = parseTerm();
 
               if (s1 !== FAILED) {
-                if (input.charCodeAt(currPos) === 123) {
-                  s2 = OpenGraphParenthesis;
+                if (input.charCodeAt(currPos) === "{".charCodeAt(0)) {
+                  s2 = openGraphParenthesis;
                   currPos++;
                 } else {
                   s2 = FAILED;
 
                   {
-                    setFail(OpenGraphParenthesisLiteral);
+                    setFail(openGraphParenthesisLiteral);
                   }
                 }
 
                 if (s2 !== FAILED) {
-                  s3 = parseNumber();
+                  if (input.charCodeAt(currPos) === ",".charCodeAt(0)) {
+                    s3 = comma;
+                    currPos++;
+                  } else {
+                    s3 = FAILED;
+
+                    {
+                      setFail(commaLiteral);
+                    }
+                  }
 
                   if (s3 !== FAILED) {
-                    if (input.charCodeAt(currPos) === 44) {
-                      s4 = comma;
-                      currPos++;
-                    } else {
-                      s4 = FAILED;
-
-                      {
-                        setFail(commaLiteral);
-                      }
-                    }
+                    s4 = parseNumber();
 
                     if (s4 !== FAILED) {
-                      if (input.charCodeAt(currPos) === 125) {
-                        s5 = CloseGraphParenthesis;
+                      if (input.charCodeAt(currPos) === "}".charCodeAt(0)) {
+                        s5 = closedGraphParenthesis;
                         currPos++;
                       } else {
                         s5 = FAILED;
 
                         {
-                          setFail(CloseGraphParenthesisLiteral);
+                          setFail(closedGraphParenthesisLiteral);
                         }
                       }
 
                       if (s5 !== FAILED) {
-                        s1 = setMinRepetition(s1, s3);
+                        s1 = setMaxRepetition(s1, s4);
                         s0 = s1;
                       } else {
                         currPos = s0;
@@ -1180,47 +1358,55 @@ function peg$parse(input, options) {
                 s1 = parseTerm();
 
                 if (s1 !== FAILED) {
-                  if (input.charCodeAt(currPos) === 123) {
-                    s2 = OpenGraphParenthesis;
+                  if (input.charCodeAt(currPos) === "{".charCodeAt(0)) {
+                    s2 = openGraphParenthesis;
                     currPos++;
                   } else {
                     s2 = FAILED;
 
                     {
-                      setFail(OpenGraphParenthesisLiteral);
+                      setFail(openGraphParenthesisLiteral);
                     }
                   }
 
                   if (s2 !== FAILED) {
-                    if (input.charCodeAt(currPos) === 44) {
-                      s3 = comma;
-                      currPos++;
-                    } else {
-                      s3 = FAILED;
-
-                      {
-                        setFail(commaLiteral);
-                      }
-                    }
+                    s3 = parseNumber();
 
                     if (s3 !== FAILED) {
-                      s4 = parseNumber();
+                      if (input.charCodeAt(currPos) === ",".charCodeAt(0)) {
+                        s4 = comma;
+                        currPos++;
+                      } else {
+                        s4 = FAILED;
+
+                        {
+                          setFail(commaLiteral);
+                        }
+                      }
 
                       if (s4 !== FAILED) {
-                        if (input.charCodeAt(currPos) === 125) {
-                          s5 = CloseGraphParenthesis;
-                          currPos++;
-                        } else {
-                          s5 = FAILED;
-
-                          {
-                            setFail(CloseGraphParenthesisLiteral);
-                          }
-                        }
+                        s5 = parseNumber();
 
                         if (s5 !== FAILED) {
-                          s1 = setMaxRepetition(s1, s4);
-                          s0 = s1;
+                          if (input.charCodeAt(currPos) === "}".charCodeAt(0)) {
+                            s6 = closedGraphParenthesis;
+                            currPos++;
+                          } else {
+                            s6 = FAILED;
+
+                            {
+                              setFail(closedGraphParenthesisLiteral);
+                            }
+                          }
+
+                          if (s6 !== FAILED) {
+                            console.log(s1)
+                            s1 = setRepetition(s1, s3, s5);
+                            s0 = s1;
+                          } else {
+                            currPos = s0;
+                            s0 = FAILED;
+                          }
                         } else {
                           currPos = s0;
                           s0 = FAILED;
@@ -1243,82 +1429,7 @@ function peg$parse(input, options) {
                 }
 
                 if (s0 === FAILED) {
-                  s0 = currPos;
-                  s1 = parseTerm();
-
-                  if (s1 !== FAILED) {
-                    if (input.charCodeAt(currPos) === 123) {
-                      s2 = OpenGraphParenthesis;
-                      currPos++;
-                    } else {
-                      s2 = FAILED;
-
-                      {
-                        setFail(OpenGraphParenthesisLiteral);
-                      }
-                    }
-
-                    if (s2 !== FAILED) {
-                      s3 = parseNumber();
-
-                      if (s3 !== FAILED) {
-                        if (input.charCodeAt(currPos) === 44) {
-                          s4 = comma;
-                          currPos++;
-                        } else {
-                          s4 = FAILED;
-
-                          {
-                            setFail(commaLiteral);
-                          }
-                        }
-
-                        if (s4 !== FAILED) {
-                          s5 = parseNumber();
-
-                          if (s5 !== FAILED) {
-                            if (input.charCodeAt(currPos) === 125) {
-                              s6 = CloseGraphParenthesis;
-                              currPos++;
-                            } else {
-                              s6 = FAILED;
-
-                              {
-                                setFail(CloseGraphParenthesisLiteral);
-                              }
-                            }
-
-                            if (s6 !== FAILED) {
-                              s1 = setRepetition(s1, s3, s5);
-                              s0 = s1;
-                            } else {
-                              currPos = s0;
-                              s0 = FAILED;
-                            }
-                          } else {
-                            currPos = s0;
-                            s0 = FAILED;
-                          }
-                        } else {
-                          currPos = s0;
-                          s0 = FAILED;
-                        }
-                      } else {
-                        currPos = s0;
-                        s0 = FAILED;
-                      }
-                    } else {
-                      currPos = s0;
-                      s0 = FAILED;
-                    }
-                  } else {
-                    currPos = s0;
-                    s0 = FAILED;
-                  }
-
-                  if (s0 === FAILED) {
-                    s0 = parseTerm();
-                  }
+                  s0 = parseTerm();
                 }
               }
             }
@@ -1327,115 +1438,10 @@ function peg$parse(input, options) {
       }
     }
 
-    return s0;
-  }
 
-  function parseTerm() {
-    var s0, s1, s2, s3;
-    s0 = parseVariable();
-
-    if (s0 === FAILED) {
-      s0 = currPos;
-      s1 = parseNumber();
-
-      if (s1 !== FAILED) {
-        s1 = setLiteral(s1);
-      }
-
-      s0 = s1;
-
-      if (s0 === FAILED) {
-        s0 = currPos;
-
-        if (input.charCodeAt(currPos) === 40) {
-          s1 = openRoundParenthesis;
-          currPos++;
-        } else {
-          s1 = FAILED;
-
-          {
-            setFail(openRoundParenthesisLiteral);
-          }
-        }
-
-        if (s1 !== FAILED) {
-          s2 = parseAlternation();
-
-          if (s2 !== FAILED) {
-            if (input.charCodeAt(currPos) === 41) {
-              s3 = closedRoundParenthesis;
-              currPos++;
-            } else {
-              s3 = FAILED;
-
-              {
-                setFail(closedRoundParenthesisLiteral);
-              }
-            }
-
-            if (s3 !== FAILED) {
-              s1 = returnArgument(s2);
-              s0 = s1;
-            } else {
-              currPos = s0;
-              s0 = FAILED;
-            }
-          } else {
-            currPos = s0;
-            s0 = FAILED;
-          }
-        } else {
-          currPos = s0;
-          s0 = FAILED;
-        }
-      }
-    }
 
     return s0;
   }
-
-  function parseName() {
-    var s0, s1, s2
-    s0 = currPos;
-    s1 = []
-
-    s2 = parseNameChar();
-
-    if (s2 !== FAILED) {
-      s1 = [];
-      while (s2 !== FAILED) {
-        s1.push(s2);
-        s2 = parseNameChar();
-      }
-    } else {
-      s1 = FAILED
-    }
-
-    if (s1 !== FAILED) {
-      s1 = s1.join('');
-      s0 = s1;
-    } else {
-      currPos = s0;
-      s0 = FAILED;
-    }
-    return s0;
-  }
-
-  function parseNameChar() {
-    var s0;
-
-    if (wordCharacters.test(input.charAt(currPos))) {
-      s0 = input.charAt(currPos);
-      currPos++;
-    } else {
-      s0 = FAILED;
-      {
-        setFail(wordCharactersClass);
-      }
-    }
-    return s0;
-  }
-
   function parseNumber() {
     var s0, s1, s2;
     s0 = currPos;
@@ -1479,32 +1485,1386 @@ function peg$parse(input, options) {
     return s0;
   }
 
+  function parseTerm() {
+    var s0, s1, s2, s3;
+
+    s0 = currPos;
+    s1 = parseChar();
+
+
+    s0 = s1;
+
+    // (expression)
+    if (s0 === FAILED) {
+      s0 = currPos;
+
+      if (input.charCodeAt(currPos) === ("(").charCodeAt(0)) {
+        s1 = openRoundParenthesis;
+        currPos++;
+      } else {
+        s1 = FAILED;
+
+        {
+          setFail(openRoundParenthesisLiteral);
+        }
+      }
+
+      if (s1 !== FAILED) {
+        s2 = parseAlternation();
+
+        if (s2 !== FAILED) {
+          if (input.charCodeAt(currPos) === (")").charCodeAt(0)) {
+            s3 = closedRoundParenthesis;
+            currPos++;
+          } else {
+            s3 = FAILED;
+
+            {
+              setFail(closedRoundParenthesisLiteral);
+            }
+          }
+
+          if (s3 !== FAILED) {
+            s1 = returnArgument(s2);
+            s0 = s1;
+          } else {
+            currPos = s0;
+            s0 = FAILED;
+          }
+        } else {
+          currPos = s0;
+          s0 = FAILED;
+        }
+      } else {
+        currPos = s0;
+        s0 = FAILED;
+      }
+    }
+
+    //[range]
+    if (s0 === FAILED) {
+      s0 = currPos;
+
+      if (input.charCodeAt(currPos) === ("[").charCodeAt(0)) {
+        s1 = openSquareParenthesis;
+        currPos++;
+      } else {
+        s1 = FAILED;
+
+        {
+          setFail(openSquareParenthesisLiteral);
+        }
+      }
+
+
+      if (s1 !== FAILED) {
+        s2 = parseWholeRange();
+        if (s2 !== FAILED) {
+          if (input.charCodeAt(currPos) === ("]").charCodeAt(0)) {
+            s3 = closedSquareParenthesis;
+            currPos++;
+          } else {
+            s3 = FAILED;
+
+            {
+              setFail(closedSquareParenthesisLiteral);
+            }
+          }
+
+          if (s3 !== FAILED) {
+            s1 = returnArgument(s2);
+            s0 = s1;
+            console.log("exit")
+            console.log(s0)
+          } else {
+            currPos = s0;
+            s0 = FAILED;
+          }
+        } else {
+          currPos = s0;
+          s0 = FAILED;
+        }
+      } else {
+        currPos = s0;
+        s0 = FAILED;
+      }
+    }
+
+    //{Definition}
+    if (s0 === FAILED) {
+      s0 = currPos;
+
+      if (input.charCodeAt(currPos) === ("{").charCodeAt(0)) {
+        s1 = openGraphParenthesis;
+        currPos++;
+      } else {
+        s1 = FAILED;
+
+        {
+          setFail(openGraphParenthesisLiteral);
+        }
+      }
+
+      if (s1 !== FAILED) {
+        s2 = parseDefinition();
+
+        if (s2 !== FAILED) {
+          if (input.charCodeAt(currPos) === ("}").charCodeAt(0)) {
+            s3 = closedGraphParenthesis;
+            currPos++;
+          } else {
+            s3 = FAILED;
+            {
+              setFail(closedGraphParenthesisLiteral);
+            }
+          }
+
+          if (s3 !== FAILED) {
+            s1 = returnArgument(s2);
+            s0 = s1;
+          } else {
+            currPos = s0;
+            s0 = FAILED;
+          }
+        } else {
+          currPos = s0;
+          s0 = FAILED;
+        }
+      } else {
+        currPos = s0;
+        s0 = FAILED;
+      }
+    }
+
+
+    return s0;
+  }
+
+  function parseWholeRange() {
+    //primo carattere ^ o - speciali
+
+    //controllare per ogni altro char se seguito da - 
+    // o se uno slash controllare wWsSdD
+
+    var s0, s1, s2, s3
+    s0 = currPos;
+
+
+    if (input.charCodeAt(currPos) === "^".charCodeAt(0)) {
+      s2 = inverseChar;
+      currPos++;
+    } else {
+      s2 = FAILED;
+
+      {
+        setFail(inverseCharLiteral);
+      }
+    }
+
+    if (s2 !== FAILED) {
+      s0 = currPos
+      s2 = parseAntiRange(true) // return Alternation or char or Failed
+      s3 = []
+      console.log(s2)
+      if (s2 !== FAILED) {
+        while (s2 !== FAILED) {
+          s3 = s3.concat(s2)
+          s2 = parseAntiRange()
+
+        }
+      } else {
+        s3 = s2
+      }
+
+      if (s3 !== FAILED) {
+        s1 = setAntiRange(s3);// s3 was an Array of integers codeChars to remove
+      } else {
+        s1 = s3
+      }
+    } else {
+      s0 = currPos
+      s2 = parseRange(true) // return Alternation, Literal or Failed
+
+      if (s2 !== FAILED) {
+        s1 = s2
+        s2 = parseRange()
+        while (s2 !== FAILED) {
+          s1 = setAlternation(s1, s2)
+          s2 = parseRange()
+        }
+      } else {
+        s1 = FAILED
+      }
+    }
+    s0 = s1;
+    return s0;
+  }
+  function parseRange(first = false) {
+
+    //controllare i cosi con la \ davanti, e ] e - 
+
+    let s0, s1, s2
+
+    s0 = currPos;
+    if (first) {
+      s1 = parseFirstRangeChar(); // return Failed or char (accept "]")
+
+
+    } else {
+      s1 = parseRangeChar(); // return Failed or char (doesnt accept "]")
+
+    }
+    if (s1 !== FAILED) {
+
+      s0 = currPos;
+      if (input.charCodeAt(currPos) === "-".charCodeAt(0)) {
+        currPos++
+        s2 = parseRangeChar()
+        if (s2 !== FAILED) {
+          s1 = setRange(s1, s2)
+          s0 = s1
+        }
+        else if (input.charCodeAt(currPos) === "]".charCodeAt(0)) {
+          s2 = setLiteral("-")
+          s1 = setAlternation(setLiteral(s1), s2)
+          s0 = s1
+        } else {
+          currPos = s0
+          s0 = FAILED;
+        }
+
+      } else {
+        s0 = setLiteral(s1)
+      }
+    } else {
+      currPos = s0
+      s0 = currPos;
+      s1 = parseBackSlash();
+
+
+      if (s1 !== FAILED) {
+        //first thing update s0
+        s0 = currPos;
+        //d,s,w,D,S,W
+        if (input.charCodeAt(currPos) === ("d").charCodeAt(0)) {
+          s2 = digits//\b
+          currPos++
+        } else {
+          s2 = FAILED
+
+          {
+            setFail(digitsClass)
+          }
+        }
+
+        if (s2 !== FAILED) {
+          s1 = setDigitsRange()
+          s0 = s1
+        } else {
+          currPos = s0
+          s0 = FAILED
+        }
+
+        if (s0 === FAILED) {
+          s0 = currPos
+          //s,w,D,S,W
+          //this is the new system, every letter from now has
+          // a specific Alternation linked if i can, or i create a new Value later
+          if (input.charCodeAt(currPos) === ("s").charCodeAt(0)) {
+            s2 = spaces;
+            currPos++;
+          } else {
+            s2 = FAILED;
+            {
+              setFail(spacesClass);
+            }
+          }
+
+          if (s2 !== FAILED) {
+            s1 = setSpacesRange();//Alternation
+            s0 = s1;
+          } else {
+            currPos = s0;
+            s0 = FAILED;
+          }
+
+          if (s0 === FAILED) {
+            s0 = currPos
+            //w,D,S,W
+            // specific Alternation linked if i can, or i create a new Value later
+            if (input.charCodeAt(currPos) === ("w").charCodeAt(0)) {
+              s2 = wordCharacters;
+              currPos++;
+            } else {
+              s2 = FAILED;
+              {
+                setFail(wordCharactersClass);
+              }
+            }
+
+            if (s2 !== FAILED) {
+              s1 = setWordRange() //Alternation
+              s0 = s1;
+            } else {
+              currPos = s0;
+              s0 = FAILED;
+            }
+
+            if (s0 === FAILED) {
+              s0 = currPos
+              //D,S,W
+              // specific Alternation linked if i can, or i create a new Value later
+              if (input.charCodeAt(currPos) === ("D").charCodeAt(0)) {
+                s2 = nonDigits;
+                currPos++;
+              } else {
+                s2 = FAILED;
+                {
+                  setFail(nonDigitsClass);
+                }
+              }
+
+              if (s2 !== FAILED) {
+                s1 = setNonDigitsRange();//Alternation
+                s0 = s1;
+              } else {
+                currPos = s0;
+                s0 = FAILED;
+              }
+
+              if (s0 === FAILED) {
+                s0 = currPos
+                //S,W
+                // specific Alternation linked if i can, or i create a new Value later
+                if (input.charCodeAt(currPos) === ("S").charCodeAt(0)) {
+                  s2 = nonSpaces;
+                  currPos++;
+                } else {
+                  s2 = FAILED;
+                  {
+                    setFail(nonSpacesClass);
+                  }
+                }
+
+                if (s2 !== FAILED) {
+                  s1 = setNonSpacesRange();//Alternation
+                  s0 = s1;
+                } else {
+                  currPos = s0;
+                  s0 = FAILED;
+                }
+
+                if (s0 === FAILED) {
+                  s0 = currPos
+                  //W
+                  // specific Alternation linked if i can, or i create a new Value later
+                  if (input.charCodeAt(currPos) === ("W").charCodeAt(0)) {
+                    s2 = nonWordCharacters;
+                    currPos++;
+                  } else {
+                    s2 = FAILED;
+                    {
+                      setFail(nonwordCharactersClass);
+                    }
+                  }
+
+                  if (s2 !== FAILED) {
+                    s1 = setNonWordRange()//Alternation
+                    s0 = s1;
+                  } else {
+                    currPos = s0;
+                    s0 = FAILED;
+                  }
+
+                  if (s0 === FAILED) {
+                    currPos = s0
+                    s0 = FAILED
+                  }
+                }
+              }
+            }
+          }
+        }
+
+
+
+
+
+
+      }
+      else {
+        currPos = s0;
+        s0 = FAILED;
+      }
+    }
+
+    return s0
+
+  }
+
+  function parseRangeChar() {
+    let s0, s1, s2
+
+    s0 = currPos;
+    s1 = parseBackSlash();
+
+
+    if (s1 !== FAILED) {
+      //first thing update s0
+      s0 = currPos;
+      //b,f,n,r,t,v   d,s,w,D,S,W
+      if (input.charCodeAt(currPos) === ("b").charCodeAt(0)) {
+        s2 = backSpace//\b
+        currPos++
+      } else {
+        s2 = FAILED
+
+        {
+          setFail(backSpaceLiteral)
+        }
+      }
+
+      if (s2 !== FAILED) {
+        s1 = s2;
+        s0 = s1
+      } else {
+        currPos = s0
+        s0 = FAILED
+      }
+
+      if (s0 === FAILED) {
+        s0 = currPos
+        //f,n,r,t,v   d,s,w,D,S,W
+        if (input.charCodeAt(currPos) === ("f").charCodeAt(0)) {
+          s2 = FormFeed;
+          currPos++;
+        } else {
+          s2 = FAILED;
+
+          {
+            setFail(formFeedLiteral);
+          }
+        }
+
+        if (s2 !== FAILED) {
+          s1 = s2;
+          s0 = s1;
+        } else {
+          currPos = s0;
+          s0 = FAILED;
+        }
+
+        if (s0 === FAILED) {
+          s0 = currPos
+          //n,r,t,v   d,s,w,D,S,W
+          if (input.charCodeAt(currPos) === ("n").charCodeAt(0)) {
+            s2 = newLine;
+            currPos++;
+          } else {
+            s2 = FAILED;
+            {
+              setFail(newLineLiteral);
+            }
+          }
+
+          if (s2 !== FAILED) {
+            s1 = s2;
+            s0 = s1;
+          } else {
+            currPos = s0;
+            s0 = FAILED;
+          }
+
+          if (s0 === FAILED) {
+            s0 = currPos
+            //r,t,v   d,s,w,D,S,W
+            if (input.charCodeAt(currPos) === ("r").charCodeAt(0)) {
+              s2 = carriageReturn;
+              currPos++;
+            } else {
+              s2 = FAILED;
+              {
+                setFail(carriageReturnLiteral);
+              }
+            }
+
+            if (s2 !== FAILED) {
+              s1 = s2;
+              s0 = s1;
+            } else {
+              currPos = s0;
+              s0 = FAILED;
+            }
+
+            if (s0 === FAILED) {
+              s0 = currPos
+              //t,v   d,s,w,D,S,W
+              if (input.charCodeAt(currPos) === ("t").charCodeAt(0)) {
+                s2 = horizontalTab;
+                currPos++;
+              } else {
+                s2 = FAILED;
+                {
+                  setFail(horizontalTabLiteral);
+                }
+              }
+
+              if (s2 !== FAILED) {
+                s1 = s2;
+                s0 = s1;
+              } else {
+                currPos = s0;
+                s0 = FAILED;
+              }
+
+              if (s0 === FAILED) {
+                s0 = currPos
+                //v   d,s,w,D,S,W
+                if (input.charCodeAt(currPos) === ("v").charCodeAt(0)) {
+                  s2 = verticalTab;
+                  currPos++;
+                } else {
+                  s2 = FAILED;
+                  {
+                    setFail(verticalTabLiteral);
+                  }
+                }
+
+                if (s2 !== FAILED) {
+                  s1 = s2;
+                  s0 = s1;
+                } else {
+                  currPos = s0;
+                  s0 = FAILED;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    else {
+      currPos = s0;
+      s0 = FAILED;
+    }
+
+    if (s0 === FAILED) {
+      s0 = currPos
+      if (/[^\]\\\n\r]/.test(input.charAt(currPos))) { //no slash newline and closing square
+        if (input.charAt(currPos) === "") {
+          s0 = FAILED
+        } else {
+          s0 = input.charAt(currPos);
+          currPos++
+        }
+      } else {
+        s0 = FAILED
+      }
+    }
+
+    return s0
+  }
+  function parseFirstRangeChar() {
+    let s0, s1, s2
+
+    s0 = currPos;
+    s1 = parseBackSlash();
+
+
+    if (s1 !== FAILED) {
+      //first thing update s0
+      s0 = currPos;
+      //b,f,n,r,t,v   d,s,w,D,S,W
+      if (input.charCodeAt(currPos) === ("b").charCodeAt(0)) {
+        s2 = backSpace//\b
+        currPos++
+      } else {
+        s2 = FAILED
+
+        {
+          setFail(backSpaceLiteral)
+        }
+      }
+
+      if (s2 !== FAILED) {
+        s1 = s2;
+        s0 = s1
+      } else {
+        currPos = s0
+        s0 = FAILED
+      }
+
+      if (s0 === FAILED) {
+        s0 = currPos
+        //f,n,r,t,v   d,s,w,D,S,W
+        if (input.charCodeAt(currPos) === ("f").charCodeAt(0)) {
+          s2 = FormFeed;
+          currPos++;
+        } else {
+          s2 = FAILED;
+
+          {
+            setFail(formFeedLiteral);
+          }
+        }
+
+        if (s2 !== FAILED) {
+          s1 = s2;
+          s0 = s1;
+        } else {
+          currPos = s0;
+          s0 = FAILED;
+        }
+
+        if (s0 === FAILED) {
+          s0 = currPos
+          //n,r,t,v   d,s,w,D,S,W
+          if (input.charCodeAt(currPos) === ("n").charCodeAt(0)) {
+            s2 = newLine;
+            currPos++;
+          } else {
+            s2 = FAILED;
+            {
+              setFail(newLineLiteral);
+            }
+          }
+
+          if (s2 !== FAILED) {
+            s1 = s2;
+            s0 = s1;
+          } else {
+            currPos = s0;
+            s0 = FAILED;
+          }
+
+          if (s0 === FAILED) {
+            s0 = currPos
+            //r,t,v   d,s,w,D,S,W
+            if (input.charCodeAt(currPos) === ("r").charCodeAt(0)) {
+              s2 = carriageReturn;
+              currPos++;
+            } else {
+              s2 = FAILED;
+              {
+                setFail(carriageReturnLiteral);
+              }
+            }
+
+            if (s2 !== FAILED) {
+              s1 = s2;
+              s0 = s1;
+            } else {
+              currPos = s0;
+              s0 = FAILED;
+            }
+
+            if (s0 === FAILED) {
+              s0 = currPos
+              //t,v   d,s,w,D,S,W
+              if (input.charCodeAt(currPos) === ("t").charCodeAt(0)) {
+                s2 = horizontalTab;
+                currPos++;
+              } else {
+                s2 = FAILED;
+                {
+                  setFail(horizontalTabLiteral);
+                }
+              }
+
+              if (s2 !== FAILED) {
+                s1 = s2;
+                s0 = s1;
+              } else {
+                currPos = s0;
+                s0 = FAILED;
+              }
+
+              if (s0 === FAILED) {
+                s0 = currPos
+                //v   d,s,w,D,S,W
+                if (input.charCodeAt(currPos) === ("v").charCodeAt(0)) {
+                  s2 = verticalTab;
+                  currPos++;
+                } else {
+                  s2 = FAILED;
+                  {
+                    setFail(verticalTabLiteral);
+                  }
+                }
+
+                if (s2 !== FAILED) {
+                  s1 = s2;
+                  s0 = s1;
+                } else {
+                  currPos = s0;
+                  s0 = FAILED;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    else {
+      currPos = s0;
+      s0 = FAILED;
+    }
+
+    if (s0 === FAILED) {
+      s0 = currPos
+      if (/[^\\\n\r]/.test(input.charAt(currPos))) { // i dont want the slash and the newlines
+        if (input.charAt(currPos) === "") {
+          s0 = FAILED
+        } else {
+          s0 = input.charAt(currPos);
+          currPos++
+        }
+      } else {
+        s0 = FAILED
+      }
+    }
+
+    return s0
+  }
+
+  function parseAntiRange(first = false) {
+
+    //controllare i cosi con la \ davanti, e ] e - 
+
+    let s0, s1, s2
+
+    s0 = currPos;
+    if (first) {
+      s1 = parseFirstRangeChar(); // return Failed or char (accept "]")
+
+    } else {
+      s1 = parseRangeChar(); // return Failed or char (doesnt accept "]")
+    }
+
+    if (s1 !== FAILED) {
+
+      s0 = currPos;
+      if (input.charCodeAt(currPos) === "-".charCodeAt(0)) {
+        currPos++
+        s2 = parseRangeChar()
+        if (s2 !== FAILED) {
+          s1 = setPreAntiRange(s1, s2) // goes from s1 to s2 and returns an array
+          s0 = s1
+        } else {
+          if (input.charCodeAt(currPos) === "]".charCodeAt(0)) {
+            s2 = "-"
+            currPos++
+            s1 = [s1.charCodeAt(0), s2.charCodeAt(0)]
+            s0 = s1
+          } else {
+            currPos = s0
+            s0 = FAILED;
+          }
+        }
+      } else {
+        s0 = [s1.charCodeAt(0)]
+        console.log(s0)
+      }
+    } else {
+      currPos = s0
+      s0 = currPos;
+      s1 = parseBackSlash();
+
+
+      if (s1 !== FAILED) {
+        //first thing update s0
+        s0 = currPos;
+        //d,s,w,D,S,W
+        if (input.charCodeAt(currPos) === ("d").charCodeAt(0)) {
+          s2 = digits//\b
+          currPos++
+        } else {
+          s2 = FAILED
+
+          {
+            setFail(digitsClass)
+          }
+        }
+
+        if (s2 !== FAILED) {
+          s1 = setDigitsAntiRange() //array
+          s0 = s1
+        } else {
+          currPos = s0
+          s0 = FAILED
+        }
+
+        if (s0 === FAILED) {
+          s0 = currPos
+          //s,w,D,S,W
+          //this is the new system, every letter from now has
+          // a specific Alternation linked if i can, or i create a new Value later
+          if (input.charCodeAt(currPos) === ("s").charCodeAt(0)) {
+            s2 = spaces;
+            currPos++;
+          } else {
+            s2 = FAILED;
+            {
+              setFail(spacesClass);
+            }
+          }
+
+          if (s2 !== FAILED) {
+            s1 = setSpacesAntiRange();//array
+            s0 = s1;
+          } else {
+            currPos = s0;
+            s0 = FAILED;
+          }
+
+          if (s0 === FAILED) {
+            s0 = currPos
+            //w,D,S,W
+            // specific Alternation linked if i can, or i create a new Value later
+            if (input.charCodeAt(currPos) === ("w").charCodeAt(0)) {
+              s2 = wordCharacters;
+              currPos++;
+            } else {
+              s2 = FAILED;
+              {
+                setFail(wordCharactersClass);
+              }
+            }
+
+            if (s2 !== FAILED) {
+              s1 = setWordAntiRange() //array
+              s0 = s1;
+            } else {
+              currPos = s0;
+              s0 = FAILED;
+            }
+
+            if (s0 === FAILED) {
+              s0 = currPos
+              //D,S,W
+              // specific Alternation linked if i can, or i create a new Value later
+              if (input.charCodeAt(currPos) === ("D").charCodeAt(0)) {
+                s2 = nonDigits;
+                currPos++;
+              } else {
+                s2 = FAILED;
+                {
+                  setFail(nonDigitsClass);
+                }
+              }
+
+              if (s2 !== FAILED) {
+                s1 = setNonDigitsAntiRange();//array
+                s0 = s1;
+              } else {
+                currPos = s0;
+                s0 = FAILED;
+              }
+
+              if (s0 === FAILED) {
+                s0 = currPos
+                //S,W
+                // specific Alternation linked if i can, or i create a new Value later
+                if (input.charCodeAt(currPos) === ("S").charCodeAt(0)) {
+                  s2 = nonSpaces;
+                  currPos++;
+                } else {
+                  s2 = FAILED;
+                  {
+                    setFail(nonSpacesClass);
+                  }
+                }
+
+                if (s2 !== FAILED) {
+                  s1 = setNonSpacesAntiRange();//array
+                  s0 = s1;
+                } else {
+                  currPos = s0;
+                  s0 = FAILED;
+                }
+
+                if (s0 === FAILED) {
+                  s0 = currPos
+                  //W
+                  // specific Alternation linked if i can, or i create a new Value later
+                  if (input.charCodeAt(currPos) === ("W").charCodeAt(0)) {
+                    s2 = nonWordCharacters;
+                    currPos++;
+                  } else {
+                    s2 = FAILED;
+                    {
+                      setFail(nonwordCharactersClass);
+                    }
+                  }
+
+                  if (s2 !== FAILED) {
+                    s1 = setNonWordAntiRange() //array
+                    s0 = s1;
+                  } else {
+                    currPos = s0;
+                    s0 = FAILED;
+                  }
+
+                  if (s0 === FAILED) {
+                    currPos = s0
+                    s0 = FAILED
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      else {
+        currPos = s0;
+        s0 = FAILED;
+      }
+    }
+
+    return s0
+
+  }
+
+  function parseBackSlash() {
+    let s0, s1
+    s0 = currPos;
+
+    if (input.charCodeAt(currPos) === ("\\").charCodeAt(0)) {
+      s1 = backslash
+      currPos++;
+    } else {
+      s1 = FAILED;
+      {
+        setFail(backslashLiteral);
+      }
+    }
+
+    if (s1 !== FAILED) {
+      s0 = s1
+    } else {
+      currPos = s0;
+      s0 = FAILED
+    }
+    return s0;
+  }
+  function parseChar() {
+    let s0, s1, s2
+
+    s0 = currPos;
+    s1 = parseBackSlash();
+
+
+    if (s1 !== FAILED) {
+      //first thing update s0
+      s0 = currPos;
+      //b,f,n,r,t,v   d,s,w,D,S,W
+      if (input.charCodeAt(currPos) === ("b").charCodeAt(0)) {
+        s2 = backSpace//\b
+        currPos++
+      } else {
+        s2 = FAILED
+
+        {
+          setFail(backSpaceLiteral)
+        }
+      }
+
+      if (s2 !== FAILED) {
+        s1 = setLiteral("\b");
+        s0 = s1
+      } else {
+        currPos = s0
+        s0 = FAILED
+      }
+
+      if (s0 === FAILED) {
+        s0 = currPos
+        //f,n,r,t,v   d,s,w,D,S,W
+        if (input.charCodeAt(currPos) === ("f").charCodeAt(0)) {
+          s2 = FormFeed;
+          currPos++;
+        } else {
+          s2 = FAILED;
+
+          {
+            setFail(formFeedLiteral);
+          }
+        }
+
+        if (s2 !== FAILED) {
+          s1 = setLiteral("\f");
+          s0 = s1;
+        } else {
+          currPos = s0;
+          s0 = FAILED;
+        }
+
+        if (s0 === FAILED) {
+          s0 = currPos
+          //n,r,t,v   d,s,w,D,S,W
+          if (input.charCodeAt(currPos) === ("n").charCodeAt(0)) {
+            s2 = newLine;
+            currPos++;
+          } else {
+            s2 = FAILED;
+            {
+              setFail(newLineLiteral);
+            }
+          }
+
+          if (s2 !== FAILED) {
+            s1 = setLiteral("\n");
+            s0 = s1;
+          } else {
+            currPos = s0;
+            s0 = FAILED;
+          }
+
+          if (s0 === FAILED) {
+            s0 = currPos
+            //r,t,v   d,s,w,D,S,W
+            if (input.charCodeAt(currPos) === ("r").charCodeAt(0)) {
+              s2 = carriageReturn;
+              currPos++;
+            } else {
+              s2 = FAILED;
+              {
+                setFail(carriageReturnLiteral);
+              }
+            }
+
+            if (s2 !== FAILED) {
+              s1 = setLiteral("\r");
+              s0 = s1;
+            } else {
+              currPos = s0;
+              s0 = FAILED;
+            }
+
+            if (s0 === FAILED) {
+              s0 = currPos
+              //t,v   d,s,w,D,S,W
+              if (input.charCodeAt(currPos) === ("t").charCodeAt(0)) {
+                s2 = horizontalTab;
+                currPos++;
+              } else {
+                s2 = FAILED;
+                {
+                  setFail(horizontalTabLiteral);
+                }
+              }
+
+              if (s2 !== FAILED) {
+                s1 = setLiteral("\t");
+                s0 = s1;
+              } else {
+                currPos = s0;
+                s0 = FAILED;
+              }
+
+              if (s0 === FAILED) {
+                s0 = currPos
+                //v   d,s,w,D,S,W
+                if (input.charCodeAt(currPos) === ("v").charCodeAt(0)) {
+                  s2 = verticalTab;
+                  currPos++;
+                } else {
+                  s2 = FAILED;
+                  {
+                    setFail(verticalTabLiteral);
+                  }
+                }
+
+                if (s2 !== FAILED) {
+                  s1 = setLiteral("\v");
+                  s0 = s1;
+                } else {
+                  currPos = s0;
+                  s0 = FAILED;
+                }
+
+                if (s0 === FAILED) {
+                  s0 = currPos
+                  //d,s,w,D,S,W
+                  //this is the new system, every letter from now has
+                  // a specific Alternation linked if i can, or i create a new Value later
+                  if (input.charCodeAt(currPos) === ("d").charCodeAt(0)) {
+                    s2 = digits;
+                    currPos++;
+                  } else {
+                    s2 = FAILED;
+                    {
+                      setFail(digitsClass);
+                    }
+                  }
+
+                  if (s2 !== FAILED) {
+                    s1 = setDigitsRange(); // Alternation
+                    s0 = s1;
+                  } else {
+                    currPos = s0;
+                    s0 = FAILED;
+                  }
+
+                  if (s0 === FAILED) {
+                    s0 = currPos
+                    //s,w,D,S,W
+                    //this is the new system, every letter from now has
+                    // a specific Alternation linked if i can, or i create a new Value later
+                    if (input.charCodeAt(currPos) === ("s").charCodeAt(0)) {
+                      s2 = spaces;
+                      currPos++;
+                    } else {
+                      s2 = FAILED;
+                      {
+                        setFail(spacesClass);
+                      }
+                    }
+
+                    if (s2 !== FAILED) {
+                      s1 = setSpacesRange();//Alternation
+                      s0 = s1;
+                    } else {
+                      currPos = s0;
+                      s0 = FAILED;
+                    }
+
+                    if (s0 === FAILED) {
+                      s0 = currPos
+                      //w,D,S,W
+                      // specific Alternation linked if i can, or i create a new Value later
+                      if (input.charCodeAt(currPos) === ("w").charCodeAt(0)) {
+                        s2 = wordCharacters;
+                        currPos++;
+                      } else {
+                        s2 = FAILED;
+                        {
+                          setFail(wordCharactersClass);
+                        }
+                      }
+
+                      if (s2 !== FAILED) {
+                        s1 = setWordRange();//Alternation
+                        s0 = s1;
+                      } else {
+                        currPos = s0;
+                        s0 = FAILED;
+                      }
+
+                      if (s0 === FAILED) {
+                        s0 = currPos
+                        //D,S,W
+                        // specific Alternation linked if i can, or i create a new Value later
+                        if (input.charCodeAt(currPos) === ("D").charCodeAt(0)) {
+                          s2 = nonDigits;
+                          currPos++;
+                        } else {
+                          s2 = FAILED;
+                          {
+                            setFail(nonDigitsClass);
+                          }
+                        }
+
+                        if (s2 !== FAILED) {
+                          s1 = setNonDigitsRange();//Alternation
+                          s0 = s1;
+                        } else {
+                          currPos = s0;
+                          s0 = FAILED;
+                        }
+
+                        if (s0 === FAILED) {
+                          s0 = currPos
+                          //S,W
+                          // specific Alternation linked if i can, or i create a new Value later
+                          if (input.charCodeAt(currPos) === ("S").charCodeAt(0)) {
+                            s2 = nonSpaces;
+                            currPos++;
+                          } else {
+                            s2 = FAILED;
+                            {
+                              setFail(nonSpacesClass);
+                            }
+                          }
+
+                          if (s2 !== FAILED) {
+                            s1 = setNonSpacesRange();//Alternation
+                            s0 = s1;
+                          } else {
+                            currPos = s0;
+                            s0 = FAILED;
+                          }
+
+                          if (s0 === FAILED) {
+                            s0 = currPos
+                            //W
+                            // specific Alternation linked if i can, or i create a new Value later
+                            if (input.charCodeAt(currPos) === ("W").charCodeAt(0)) {
+                              s2 = nonWordCharacters;
+                              currPos++;
+                            } else {
+                              s2 = FAILED;
+                              {
+                                setFail(nonwordCharactersClass);
+                              }
+                            }
+
+                            if (s2 !== FAILED) {
+                              s1 = setNonWordRange();//Alternation
+                              s0 = s1;
+                            } else {
+                              currPos = s0;
+                              s0 = FAILED;
+                            }
+
+                            if (s0 === FAILED) {
+                              //All other characters
+                              s0 = currPos
+                              s2 = input.charCodeAt(currPos);
+                              currPos++;
+                              if (!s2) {
+                                s1 = setLiteral(s2)
+                                s0 = s1
+                              } else {
+                                currPos = s0
+                                s0 = FAILED
+                                //broken
+                                return s0
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    else {
+      currPos = s0;
+      s0 = FAILED;
+    }
+
+    //point
+    if (s0 === FAILED) {
+      s0 = currPos;
+
+      if (input.charCodeAt(currPos) === (".").charCodeAt(0)) {
+        s1 = point;
+        currPos++;
+      } else {
+        s1 = FAILED;
+
+        {
+          setFail(pointLiteral);
+        }
+      }
+
+      if (s1 !== FAILED) {
+        s1 = setPointRange();//Alternation for every non space character
+        s0 = s1;
+      } else {
+        currPos = s0;
+        s0 = FAILED;
+      }
+    }
+
+
+    //every non metacharacter {}[]()/$|*+?
+    if (s0 === FAILED) {
+      s0 = currPos
+      if (nonMetaCharacters.test(input.charAt(currPos))) {
+
+        s1 = input.charAt(currPos);
+        currPos++;
+      } else {
+        s1 = FAILED;
+        {
+          setFail(nonMetaCharactersClass);
+        }
+      }
+      if (s1 !== FAILED) {
+        s0 = setLiteral(s1)
+      } else {
+        currPos = s0
+        s0 = FAILED
+      }
+    }
+
+    return s0
+  }
+  function parseName() {
+    var s0, s1, s2
+    s0 = currPos;
+    s1 = []
+
+    s2 = parseNameChar();
+
+    if (s2 !== FAILED) {
+      s1 = [];
+      while (s2 !== FAILED) {
+        s1.push(s2);
+        s2 = parseNameChar();
+      }
+    } else {
+      s1 = FAILED
+    }
+
+    if (s1 !== FAILED) {
+      s1 = s1.join('');
+      s0 = s1;
+    } else {
+      currPos = s0;
+      s0 = FAILED;
+    }
+    return s0;
+  }
+
+  function parseNameChar() {
+    var s0;
+
+    if (wordCharacters.test(input.charAt(currPos))) {
+      s0 = input.charAt(currPos);
+      currPos++;
+    } else {
+      s0 = FAILED;
+      {
+        setFail(wordCharactersClass);
+      }
+    }
+    return s0;
+  }
+
   function parseSpaces() {
     var s0, s1;
     s0 = [];
 
-    if (peg$c55.test(input.charAt(currPos))) {
+    if (spaces.test(input.charAt(currPos))) {
       s1 = input.charAt(currPos);
       currPos++;
     } else {
       s1 = FAILED;
 
       {
-        setFail(peg$c56);
+        setFail(spacesClass);
       }
     }
 
     while (s1 !== FAILED) {
       s0.push(s1);
 
-      if (peg$c55.test(input.charAt(currPos))) {
+      if (spaces.test(input.charAt(currPos))) {
         s1 = input.charAt(currPos);
         currPos++;
       } else {
         s1 = FAILED;
 
         {
-          setFail(peg$c56);
+          setFail(spacesClass);
         }
       }
     }
@@ -1513,22 +2873,22 @@ function peg$parse(input, options) {
   }
 
   var n = nodes;
-  peg$result = peg$startRuleFunction();
+  peg$result = startRuleFunction();
 
   if (peg$result !== FAILED && currPos === input.length) {
     return peg$result;
   } else {
     if (peg$result !== FAILED && currPos < input.length) {
-      setFail(peg$endExpectation());
+      setFail(endExpectation());
     }
 
-    throw peg$buildStructuredError(peg$maxFailExpected, peg$maxFailPos < input.length ? input.charAt(peg$maxFailPos) : null, peg$maxFailPos < input.length ? peg$computeLocation(peg$maxFailPos, peg$maxFailPos + 1) : peg$computeLocation(peg$maxFailPos, peg$maxFailPos));
+    throw buildStructuredError(maxFailExpectedArray, maxFailPos < input.length ? input.charAt(maxFailPos) : null, maxFailPos < input.length ? computeLocation(maxFailPos, maxFailPos + 1) : computeLocation(maxFailPos, maxFailPos));
   }
 }
 
 var grammar = {
-  SyntaxError: peg$SyntaxError,
-  parse: peg$parse
+  SyntaxError: SyntaxErrorObject,
+  parse: parseFuntion
 };
 
 /**
@@ -1538,6 +2898,7 @@ var grammar = {
 class SymbolTable {
   constructor(statements, externalSymbols = {}) {
     this.variables = {};
+    this.definitions = {};
     this.symbols = {};
     this.main = null;
     this.size = 0;
@@ -1547,7 +2908,7 @@ class SymbolTable {
 
   addExternalSymbols(externalSymbols) {
     for (var key in externalSymbols) {
-      this.variables[key] = new Literal(externalSymbols[key]);
+      // this.variables[key] = new Literal(externalSymbols[key]);
       this.symbols[key] = externalSymbols[key];
       this.size++;
     }
@@ -1556,37 +2917,46 @@ class SymbolTable {
   process(statements) {
     for (var statement of statements) {
       if (statement instanceof Assignment) {
-        this.variables[statement.variable.name] = this.processExpression(statement.expression);
-
-        if (statement.expression instanceof Literal) {
-          this.symbols[statement.variable.name] = statement.expression.value;
-          this.size++;
+        if (statement.variable instanceof Definition) {
+          this.definitions[statement.variable.name] = this.processExpression(statement.expression);
+        } else {
+          this.variables[statement.variable.name] = this.processExpression(statement.expression);
         }
+        // if (statement.expression instanceof Literal) {
+        //   this.symbols[statement.variable.name] = statement.expression.value;
+        //   this.size++;
+        // }
       }
     }
 
-    this.main = this.variables.main;
-
+    console.log(Object.keys(this.variables))
+    for (const variableName of Object.keys(this.variables)) {
+      const newTokenizer = new Concatenation(this.variables[variableName], new Tag(variableName))
+      if (!this.main) {
+        this.main = newTokenizer
+      } else {
+        this.main = new Alternation(this.main, newTokenizer)
+      }
+    }
     if (!this.main) {
       throw new Error('No main variable declaration found');
     }
   }
 
   processExpression(expr) {
+
     // Process children
     for (var key in expr) {
       if (expr[key] instanceof Node) {
         expr[key] = this.processExpression(expr[key]);
       }
-    } // Replace variable references with their values
+    } // Replace definitions references with their values
 
-
-    if (expr instanceof Variable) {
-      var value = this.variables[expr.name];
+    if (expr instanceof Definition) {
+      var value = this.definitions[expr.name];
       if (value == null) throw new Error("Undeclared indentifier ".concat(expr.name));
       expr = this.processExpression(value.copy());
     }
-
     return expr;
   }
 
@@ -1601,11 +2971,12 @@ var END_MARKER = new EndMarker();
  * http://www.informatik.uni-bremen.de/agbkb/lehre/ccfl/Material/ALSUdragonbook.pdf
  */
 
-function buildDFA(root, numSymbols) {
+function buildDFA(root, lenSymbols, Symbols) {
   root = new Concatenation(root, END_MARKER);
   root.calcFollowpos();
-  var failState = new State(new Set(), numSymbols);
-  var initialState = new State(root.firstpos, numSymbols);
+
+  var failState = new State(new Set(), lenSymbols);
+  var initialState = new State(root.firstpos, lenSymbols);
   var dstates = [failState, initialState]; // while there is an unmarked state S in dstates
 
   while (1) {
@@ -1623,9 +2994,9 @@ function buildDFA(root, numSymbols) {
     } // mark S
 
 
-    s.marked = true; // for each input symbol a
+    s.marked = true; // for each input symbol 
 
-    for (var a = 0; a < numSymbols; a++) {
+    for (const a in Symbols) {
       // let U be the union of followpos(p) for all
       //  p in S that correspond to a
       var u = new Set();
@@ -1640,7 +3011,6 @@ function buildDFA(root, numSymbols) {
         continue;
       } // if U is not in dstates
 
-
       var ux = -1;
 
       for (var i = 0; i < dstates.length; i++) {
@@ -1652,14 +3022,12 @@ function buildDFA(root, numSymbols) {
 
       if (ux === -1) {
         // Add U as an unmarked state to dstates
-        dstates.push(new State(u, numSymbols));
+        dstates.push(new State(u, lenSymbols));
         ux = dstates.length - 1;
       }
-
-      s.transitions[a] = ux;
+      s.transitions[Symbols[a]] = ux;
     }
   }
-
   return dstates;
 }
 
@@ -1709,7 +3077,7 @@ class StateMachine {
       for (var p = s; p < str.length; p++) {
         var c = str[p];
         lastState = state;
-        state = self.stateTable[state][c];
+        state = self.stateTable[state][c.charCodeAt(0)];
 
         if (state === FAIL_STATE) {
           // yield the last match if any
@@ -1718,7 +3086,7 @@ class StateMachine {
           } // reset the state as if we started over from the initial state
 
 
-          state = self.stateTable[INITIAL_STATE][c];
+          state = self.stateTable[INITIAL_STATE][c.charCodeAt(0)];
           startRun = null;
         } // start a run if not in the failure state
 
@@ -1771,7 +3139,8 @@ function parse(string, externalSymbols) {
   return new SymbolTable(ast, externalSymbols);
 }
 function build(symbolTable) {
-  var states = buildDFA(symbolTable.main, symbolTable.size);
+  console.log(symbolTable)
+  var states = buildDFA(symbolTable.main, symbolTable.size, symbolTable.symbols);
   return new StateMachine({
     stateTable: states.map(s => Array.from(s.transitions)),
     accepting: states.map(s => s.accepting),
